@@ -45,6 +45,7 @@ class MainActivity : AppCompatActivity() {
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView?, url: String?) {
                 activarSonido()
+                inyectarSenalTv()
             }
 
             override fun onReceivedError(
@@ -70,10 +71,12 @@ class MainActivity : AppCompatActivity() {
         webView.loadUrl(TUBEX_BASE_URL)
 
         onBackPressedDispatcher.addCallback(this) {
-            if (webView.canGoBack()) {
-                webView.goBack()
-            } else {
-                finish()
+            salirDePantallaCompletaSiAplica { enFullscreen ->
+                if (!enFullscreen && webView.canGoBack()) {
+                    webView.goBack()
+                } else if (!enFullscreen) {
+                    finish()
+                }
             }
         }
 
@@ -83,6 +86,30 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         AppUpdater.retryPendingInstall(this)
+    }
+
+    private fun salirDePantallaCompletaSiAplica(continuar: (Boolean) -> Unit) {
+        webView.evaluateJavascript(
+            """
+            (function(){
+              try {
+                if (window.__tubexIsFs && window.__tubexIsFs()) {
+                  if (window.__tubexExitFs) window.__tubexExitFs();
+                  return "fs";
+                }
+              } catch(e) {}
+              return "no";
+            })();
+            """.trimIndent()
+        ) { resultado ->
+            val enFullscreen = resultado?.trim()?.quotedEquals("fs") == true
+            continuar(enFullscreen)
+        }
+    }
+
+    private fun String?.quotedEquals(valor: String): Boolean {
+        val t = this?.trim()
+        return t == valor || t == "\"$valor\"" || t == "'$valor'"
     }
 
     private fun esAndroidTv(): Boolean {
@@ -99,6 +126,21 @@ class MainActivity : AppCompatActivity() {
             ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         } else {
             ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        }
+    }
+
+    private fun inyectarSenalTv() {
+        if (!esAndroidTv()) return
+        runOnUiThread {
+            webView.evaluateJavascript(
+                """
+                (function(){
+                  window.__tubexIsTV = true;
+                  return true;
+                })();
+                """.trimIndent(),
+                null
+            )
         }
     }
 
@@ -139,7 +181,8 @@ class MainActivity : AppCompatActivity() {
                 KeyEvent.KEYCODE_DPAD_CENTER,
                 KeyEvent.KEYCODE_ENTER,
                 KeyEvent.KEYCODE_MEDIA_PLAY,
-                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> activarSonido()
+                KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                KeyEvent.KEYCODE_MEDIA_PAUSE -> activarSonido()
             }
         }
         return super.dispatchKeyEvent(event)
