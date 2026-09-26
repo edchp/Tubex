@@ -103,7 +103,7 @@ private fun downloadAndInstall(activity: AppCompatActivity, apkUrl: String) {
                 val dir = activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: activity.cacheDir
                 val apkFile = File(dir, "tubex-update.apk")
                 var error: Exception? = null
-                val sources = listOf(MIRROR_URL, apkUrl)
+                val sources = listOf(apkUrl, MIRROR_URL)
                 for (source in sources) {
                     var attempt = 0
                     while (attempt < 3) {
